@@ -7,17 +7,19 @@ usage() {
 Publish local maioutils changes to GitHub.
 
 Usage:
-  ./scripts/publish.sh [--yes] [--dry-run] ["commit message"]
+  ./scripts/publish.sh [--yes] [--dry-run] [--bump LEVEL] ["commit message"]
 
 Options:
   -y, --yes      Skip the final confirmation prompt.
   -n, --dry-run  Run checks and show changes without committing or pushing.
+  -b, --bump     Increment the version: patch, minor, or major.
   -h, --help     Show this help message.
 EOF
 }
 
 confirm=false
 dry_run=false
+bump_level=""
 commit_message=""
 
 while (($#)); do
@@ -27,6 +29,17 @@ while (($#)); do
             ;;
         -n|--dry-run)
             dry_run=true
+            ;;
+        -b|--bump)
+            if (($# < 2)); then
+                echo "Error: --bump requires patch, minor, or major." >&2
+                exit 2
+            fi
+            bump_level="$2"
+            shift
+            ;;
+        --bump=*)
+            bump_level="${1#*=}"
             ;;
         -h|--help)
             usage
@@ -43,6 +56,15 @@ while (($#)); do
     esac
     shift
 done
+
+case "$bump_level" in
+    ""|patch|minor|major)
+        ;;
+    *)
+        echo "Error: version bump must be patch, minor, or major." >&2
+        exit 2
+        ;;
+esac
 
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(git -C "$script_dir/.." rev-parse --show-toplevel)"
@@ -71,14 +93,58 @@ echo "Running tests before publishing..."
 # interpreter while leaving the package tests themselves unchanged.
 "$python" -c 'import sys, types; sys.modules["readline"] = types.ModuleType("readline"); import pytest; raise SystemExit(pytest.main(["-q"]))'
 
-if [[ -z "$(git status --porcelain)" ]]; then
+current_version=""
+next_version=""
+
+if [[ -n "$bump_level" ]]; then
+    version_info="$("$python" - "$repo_root/pyproject.toml" "$bump_level" <<'PY'
+import re
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+level = sys.argv[2]
+text = path.read_text(encoding="utf-8")
+match = re.search(
+    r'^version\s*=\s*"(\d+)\.(\d+)\.(\d+)"\s*$',
+    text,
+    flags=re.MULTILINE,
+)
+if match is None:
+    raise SystemExit("Could not find a numeric X.Y.Z version in pyproject.toml")
+
+major, minor, patch = map(int, match.groups())
+current = f"{major}.{minor}.{patch}"
+
+if level == "major":
+    major, minor, patch = major + 1, 0, 0
+elif level == "minor":
+    minor, patch = minor + 1, 0
+else:
+    patch += 1
+
+print(current, f"{major}.{minor}.{patch}")
+PY
+)"
+    read -r current_version next_version <<< "$version_info"
+fi
+
+if [[ -z "$(git status --porcelain)" && -z "$bump_level" ]]; then
     echo "Nothing to publish: the working tree is clean."
     exit 0
 fi
 
 echo
 echo "Changes that will be published:"
-git status --short
+if [[ -n "$(git status --porcelain)" ]]; then
+    git status --short
+else
+    echo "  (version bump only)"
+fi
+
+if [[ -n "$bump_level" ]]; then
+    echo "Version bump: $current_version -> $next_version ($bump_level)"
+fi
 
 if [[ "$dry_run" == true ]]; then
     echo
@@ -107,9 +173,35 @@ if [[ "$confirm" != true ]]; then
     esac
 fi
 
+if [[ -n "$bump_level" ]]; then
+    "$python" - "$repo_root/pyproject.toml" "$current_version" "$next_version" <<'PY'
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+old_version = sys.argv[2]
+new_version = sys.argv[3]
+text = path.read_text(encoding="utf-8")
+old_line = f'version = "{old_version}"'
+
+if text.count(old_line) != 1:
+    raise SystemExit(f"Expected exactly one {old_line!r} entry")
+
+path.write_text(
+    text.replace(old_line, f'version = "{new_version}"', 1),
+    encoding="utf-8",
+)
+PY
+fi
+
+git diff --check
 git add --all
 git commit -m "$commit_message"
 git pull --rebase origin "$branch"
 git push --set-upstream origin "$branch"
 
-echo "Published successfully to origin/$branch."
+if [[ -n "$bump_level" ]]; then
+    echo "Published maioutils $next_version successfully to origin/$branch."
+else
+    echo "Published successfully to origin/$branch."
+fi

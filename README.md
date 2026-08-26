@@ -55,6 +55,22 @@ GitHub with:
 ./scripts/publish.sh --dry-run
 ```
 
+Versions are unchanged by default. Optionally increment the semantic version
+stored in `pyproject.toml` as part of the same commit:
+
+```bash
+./scripts/publish.sh --bump patch "Fix synthetic ID generation"
+./scripts/publish.sh --bump minor "Add a new utility"
+./scripts/publish.sh --bump major "Change the public API"
+```
+
+Use `--dry-run` together with `--bump` to preview the next version without
+editing any files:
+
+```bash
+./scripts/publish.sh --dry-run --bump patch
+```
+
 ## Updating a remote installation
 
 On a remote machine that has cloned the repository, activate the environment
