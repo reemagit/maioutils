@@ -66,6 +66,10 @@ source /path/to/venv/bin/activate
 ./scripts/update_remote.sh
 ```
 
+Active Conda environments are detected automatically through `CONDA_PREFIX`.
+If no virtualenv or Conda environment is active, the updater uses `python` or
+`python3` from the current shell.
+
 Alternatively, pass the environment or Python executable directly:
 
 ```bash

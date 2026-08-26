@@ -10,8 +10,8 @@ Usage:
   ./scripts/update_remote.sh [VENV_OR_PYTHON]
 
 VENV_OR_PYTHON may be either a virtual-environment directory or the full path
-to its Python executable. If omitted, the script uses the active virtual
-environment, then falls back to .venv inside the repository.
+to its Python executable. If omitted, the script uses the active virtualenv or
+Conda environment, then falls back to python or python3 from the current PATH.
 
 Optional environment variables:
   MAIOUTILS_REMOTE  Git remote to pull from (default: origin)
@@ -56,8 +56,16 @@ if (($# == 1)); then
     fi
 elif [[ -n "${VIRTUAL_ENV:-}" ]]; then
     python="$VIRTUAL_ENV/bin/python"
+elif [[ -n "${CONDA_PREFIX:-}" ]]; then
+    python="$CONDA_PREFIX/bin/python"
+elif command -v python >/dev/null 2>&1; then
+    python="$(command -v python)"
+elif command -v python3 >/dev/null 2>&1; then
+    python="$(command -v python3)"
 else
-    python="$repo_root/.venv/bin/python"
+    echo "Error: no Python executable was found in the current environment." >&2
+    echo "Activate Conda/a virtualenv or pass its path explicitly." >&2
+    exit 1
 fi
 
 if [[ ! -x "$python" ]]; then
@@ -69,7 +77,7 @@ fi
 echo "Updating $repo_root from $remote/$branch..."
 git pull --ff-only "$remote" "$branch"
 
-echo "Installing the updated package into $python..."
+echo "Installing the updated package with $python..."
 "$python" -m pip install --upgrade "$repo_root"
 
 "$python" -c 'from importlib.metadata import version; from maioutils import make_synthetic_dataframe; print("maioutils {} is ready".format(version("maioutils")))'
