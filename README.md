@@ -37,3 +37,41 @@ fake_df = make_synthetic_dataframe(
 
 Additional utilities may be added later as focused subpackages such as
 `validation`, `stats`, or `plotting`.
+
+## Publishing changes
+
+After editing the package locally, run:
+
+```bash
+./scripts/publish.sh "Describe the change"
+```
+
+The script runs the test suite, displays the files that will be committed,
+asks for confirmation, commits the changes, incorporates any upstream changes,
+and pushes the current branch to GitHub. Preview it without changing Git or
+GitHub with:
+
+```bash
+./scripts/publish.sh --dry-run
+```
+
+## Updating a remote installation
+
+On a remote machine that has cloned the repository, activate the environment
+where `maioutils` is installed and run:
+
+```bash
+cd /path/to/maioutils
+source /path/to/venv/bin/activate
+./scripts/update_remote.sh
+```
+
+Alternatively, pass the environment or Python executable directly:
+
+```bash
+./scripts/update_remote.sh /path/to/venv
+```
+
+The updater refuses to overwrite local server changes, pulls the current
+branch using fast-forward only, and reinstalls the package in non-editable
+mode. Restart any process that already imported `maioutils` afterward.
