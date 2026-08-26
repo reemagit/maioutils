@@ -55,13 +55,20 @@ GitHub with:
 ./scripts/publish.sh --dry-run
 ```
 
-Versions are unchanged by default. Optionally increment the semantic version
-stored in `pyproject.toml` as part of the same commit:
+When no version option is provided, the publisher asks whether to keep the
+current version or increment its patch, minor, or major component. You can
+also select the increment directly:
 
 ```bash
 ./scripts/publish.sh --bump patch "Fix synthetic ID generation"
 ./scripts/publish.sh --bump minor "Add a new utility"
 ./scripts/publish.sh --bump major "Change the public API"
+```
+
+Keep the current version without displaying the version prompt:
+
+```bash
+./scripts/publish.sh --no-bump "Update documentation"
 ```
 
 Use `--dry-run` together with `--bump` to preview the next version without

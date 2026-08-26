@@ -7,12 +7,13 @@ usage() {
 Publish local maioutils changes to GitHub.
 
 Usage:
-  ./scripts/publish.sh [--yes] [--dry-run] [--bump LEVEL] ["commit message"]
+  ./scripts/publish.sh [--yes] [--dry-run] [--bump LEVEL|--no-bump] ["commit message"]
 
 Options:
   -y, --yes      Skip the final confirmation prompt.
   -n, --dry-run  Run checks and show changes without committing or pushing.
   -b, --bump     Increment the version: patch, minor, or major.
+      --no-bump  Keep the current version without prompting.
   -h, --help     Show this help message.
 EOF
 }
@@ -20,6 +21,7 @@ EOF
 confirm=false
 dry_run=false
 bump_level=""
+bump_choice_set=false
 commit_message=""
 
 while (($#)); do
@@ -36,10 +38,16 @@ while (($#)); do
                 exit 2
             fi
             bump_level="$2"
+            bump_choice_set=true
             shift
             ;;
         --bump=*)
             bump_level="${1#*=}"
+            bump_choice_set=true
+            ;;
+        --no-bump)
+            bump_level=""
+            bump_choice_set=true
             ;;
         -h|--help)
             usage
@@ -86,6 +94,40 @@ if [[ ! -x "$python" ]]; then
     echo "Error: development environment not found at $repo_root/.venv" >&2
     echo "Create it with: python3 -m venv .venv && .venv/bin/pip install -e '.[dev]'" >&2
     exit 1
+fi
+
+if [[ "$bump_choice_set" != true ]]; then
+    if [[ ! -t 0 ]]; then
+        echo "Error: version selection requires an interactive terminal." >&2
+        echo "Use --bump patch|minor|major or --no-bump." >&2
+        exit 2
+    fi
+
+    echo "Version bump:"
+    echo "  0) none (default)"
+    echo "  1) patch"
+    echo "  2) minor"
+    echo "  3) major"
+    read -r -p "Select [0]: " bump_choice
+
+    case "${bump_choice:-0}" in
+        0|none|n)
+            bump_level=""
+            ;;
+        1|patch|p)
+            bump_level="patch"
+            ;;
+        2|minor)
+            bump_level="minor"
+            ;;
+        3|major)
+            bump_level="major"
+            ;;
+        *)
+            echo "Error: select 0, 1, 2, or 3." >&2
+            exit 2
+            ;;
+    esac
 fi
 
 echo "Running tests before publishing..."
